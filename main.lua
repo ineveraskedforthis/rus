@@ -1,28 +1,28 @@
 love.window.setMode(1280, 720)
-ui = require "milky.milky"
+local ui = require "milky.milky"
 ui.set_reference_screen_dimensions(1280, 720)
-nodes = {}
-price = {}
+NODES = {}
+PRICE = {}
 
-connections = {}
-node_to_connection = {}
-node_node_connection = {}
+CONNECTIONS = {}
+NODE_TO_CONNECTION = {}
+NODE_NODE_CONNECTION = {}
 
-free_agent_id = 1
-agents = {}
+FREE_AGENT_ID = 1
+AGENTS = {}
 
-node_name_rects = {}
-node_model_rects = {}
+NODE_NAME_RECTS = {}
+NODE_MODEL_RECTS = {}
 
-SCALE = 5 
+SCALE = 5
 
 
-selected_node = nil
+SELECTED_NODE = nil
 
 --- CAMERA ---
 SCREEN_CENTER = {x= 1280 / 2, y= 720 / 2}
 
-CAMERA = {x= 0, y= 0}
+CAMERA = {x= -300, y= -100}
 CAMERA_SPEED = {x= 0, y= 0}
 CAMERA_FRICTION = 0.5
 CAMERA_DIR = {x = 0, y = 0}
@@ -34,126 +34,214 @@ ZOOM_DIR = 0
 
 
 
-function connect(a, b)
-	table.insert(connections, {a, b})
-	if node_to_connection[a] == nil then
-		node_to_connection[a] = {}
-		node_node_connection[a] = {}
+function Connect(a, b)
+	table.insert(CONNECTIONS, {a, b})
+	if NODE_TO_CONNECTION[a] == nil then
+		NODE_TO_CONNECTION[a] = {}
+		NODE_NODE_CONNECTION[a] = {}
 	end
-	if node_to_connection[b] == nil then
-		node_to_connection[b] = {}
-		node_node_connection[b] = {}
+	if NODE_TO_CONNECTION[b] == nil then
+		NODE_TO_CONNECTION[b] = {}
+		NODE_NODE_CONNECTION[b] = {}
 	end
 
-	node_node_connection[a][b] = true
-	node_node_connection[b][a] = true
-	table.insert(node_to_connection[a], b)
-	table.insert(node_to_connection[b], a)
+	NODE_NODE_CONNECTION[a][b] = true
+	NODE_NODE_CONNECTION[b][a] = true
+	table.insert(NODE_TO_CONNECTION[a], b)
+	table.insert(NODE_TO_CONNECTION[b], a)
 end
 
-function create_node(name, x, y, price_furs, price_cloth) 
-	price[name] = {}
-	price[name]["furs"] = price_furs
-	price[name]["cloth"] = price_cloth
+GOODS = {
+	"furs", "cloth",
+	"silver", "iron",
+	"wine", "farms", "honey"
+}
 
-	nodes[name] = {}
-	nodes[name].x = x
-	nodes[name].y = y
-	nodes[name].name = name
-	
-	node_model_rects[name] = ui.rect(
-		x - SCALE, 
-		y - SCALE, 
-		SCALE * 2, 
+CONSUMER_GOODS = {"cloth", "wine", "honey", "farms"}
+MILITARY_GOODS = {"iron"}
+LUXURY_GOODS = {"furs", "silver"}
+
+INDUSTRY_SIZE = {}
+INDUSTRY_PSIZE = {}
+STOCK = {}
+
+function Create_node(name, x, y, population)
+	PRICE[name] = {}
+	INDUSTRY_SIZE[name] = {}
+	INDUSTRY_PSIZE[name] = {}
+	STOCK[name] = {}
+
+	for _, item in pairs(GOODS) do
+		PRICE[name][item] = 15
+		INDUSTRY_SIZE[name][item] = 0
+		INDUSTRY_PSIZE[name][item] = 0
+		STOCK[name][item] = 0
+	end
+
+	NODES[name] = {}
+	NODES[name].x = x
+	NODES[name].y = y
+	NODES[name].population = population
+	NODES[name].name = name
+	NODES[name].prosperity = 25
+
+	NODE_MODEL_RECTS[name] = ui.rect(
+		x - SCALE,
+		y - SCALE,
+		SCALE * 2,
 		SCALE * 2)
-	node_name_rects[name] = ui.rect(
-		x - 50, 
-		y - SCALE * 2 , 
-		100 , 
+	NODE_NAME_RECTS[name] = ui.rect(
+		x - 50,
+		y - SCALE * 2 ,
+		100 ,
 		SCALE)
 end
 
-function create_agent(name, node)
-	agents[free_agent_id] = {}
-	agents[free_agent_id].name = name
-	agents[free_agent_id].node = node
-	free_agent_id = free_agent_id + 1
-
-	return free_agent_id - 1
+function Add_potential_industry(node, industry, size)
+	INDUSTRY_PSIZE[node][industry] = INDUSTRY_PSIZE[node][industry] + size
 end
 
-function event_hanseatic_traders()
+function Add_industry(node, industry, size)
+	INDUSTRY_SIZE[node][industry] = INDUSTRY_SIZE[node][industry] + size
+end
+
+function Update_local_base_price()
+	for node, node_entity in pairs(NODES) do
+		local production = {}
+		local consumption = {}
+		for _, goods in pairs(CONSUMER_GOODS) do
+			consumption[goods] = node_entity.population / 1000
+		end
+  	for _, goods in pairs(LUXURY_GOODS) do
+		  consumption[goods] = node_entity.population / 1000 * node_entity.prosperity / 100
+	  end
+  	for _, goods in pairs(MILITARY_GOODS) do
+		  consumption[goods] = node_entity.population / 10000
+	  end
+	  for _, goods in pairs(GOODS) do
+		  production[goods] = INDUSTRY_SIZE[node][goods] + 1
+  	end
+	  for _, goods in pairs(GOODS) do
+		  PRICE[node][goods] = (consumption[goods] / production[goods]) * 10
+	  end
+	end
+end
+
+function Create_agent(name, node)
+	AGENTS[FREE_AGENT_ID] = {}
+	AGENTS[FREE_AGENT_ID].name = name
+	AGENTS[FREE_AGENT_ID].node = node
+	AGENTS[FREE_AGENT_ID].capacity = 5
+	FREE_AGENT_ID = FREE_AGENT_ID + 1
+
+	return FREE_AGENT_ID - 1
+end
+
+function Event_hanseatic_traders()
 
 end
 
-function buy()
+function Player_move(node)
+	if NODE_NODE_CONNECTION[node][PLAYER.node] then
+		PLAYER.node = node
+	end
+end
+
+function Buy()
 
 end
 
-function sell()
+function Sell()
 
 end
 
-function effect_change_price(region, good, dx) 
-	price[region][good] = price[region][good] + dx
-end
 
 function love.load()
 	local font_size = ui.font_size(14)
 	local font_to_use = love.graphics.newFont(font_size)
 	love.graphics.setFont(font_to_use)
 
-	create_node("Novgorod", 	200, 100, 	10,  10)
-	create_node("Torzhok",		200, 160,	12,  15)
+	Create_node("Novgorod", 	200, 100,     	 40000)
+		
+	Create_node("Torzhok",		200, 160,	  2000)
 
-	create_node("Tver", 		210, 180,	15,  15)
-	create_node("Volok Lamsky",	180, 210,       15,  15)
-	create_node("Yaroslavl",	300, 190,       15,  15)
-	create_node("Rostov",		280, 220,       15,  15)
+	Create_node("Tver", 		210, 180,	 10000)
+	Create_node("Volok Lamsky",	180, 210,          500)
+	Create_node("Yaroslavl",	300, 190,        15000)
+	Create_node("Rostov",		280, 220,         8000)
 
-	create_node("Kostroma",		340, 270,	15,15)
-	create_node("Nizhny Novgorod",  350, 300,	15,15)
-	create_node("Vladimir",		250, 290,	15,15)
+	Create_node("Kostroma",		340, 270,	  2000)
+	Create_node("Nizhny Novgorod",  350, 300,	  9000)
+	Create_node("Vladimir",		250, 290,	 25000)
 	
 
-	create_node("Bulgaria",		600, 320,	15,15)
+	Create_node("Bulgaria",		600, 320,	100000)
+	
 
 	
-	create_node("Visby",		40,  40,	20,  5)
-	create_node("Riga",		50,  100, 	20,  5)
-	create_node("Pskov",		120, 120,	12, 12)
-	create_node("Neva",		200, 50,	12, 12)
+	Create_node("Visby",		40,  40,	  4000)
+	Create_node("Riga",		50,  100,	 20000)
+	Create_node("Pskov",		120, 120,	 20000)
+	Create_node("Neva",		200, 50,	   700)
 
 
 
-	connect("Tver", "Yaroslavl")
-	connect("Tver", "Volok Lamsky")
-	connect("Tver", "Torzhok")
-	connect("Volok Lamsky", "Vladimir")
+	Connect("Tver", "Yaroslavl")
+	Connect("Tver", "Volok Lamsky")
+	Connect("Tver", "Torzhok")
+	Connect("Volok Lamsky", "Vladimir")
 
-	connect("Yaroslavl", "Rostov")
-	connect("Yaroslavl", "Kostroma")
+	Connect("Yaroslavl", "Rostov")
+	Connect("Yaroslavl", "Kostroma")
 	
-	connect("Nizhny Novgorod", "Vladimir")
-	connect("Nizhny Novgorod", "Bulgaria")
-	connect("Nizhny Novgorod", "Kostroma")
+	Connect("Nizhny Novgorod", "Vladimir")
+	Connect("Nizhny Novgorod", "Bulgaria")
+	Connect("Nizhny Novgorod", "Kostroma")
 	
-	connect("Novgorod", "Pskov")
-	connect("Novgorod", "Neva")
-	connect("Novgorod", "Torzhok")
+	Connect("Novgorod", "Pskov")
+	Connect("Novgorod", "Neva")
+	Connect("Novgorod", "Torzhok")
 	
-	connect("Riga", "Pskov")
+	Connect("Riga", "Pskov")
 
-	player_id = create_agent('Player', 'Novgorod')
-	player = agents[player_id]
+	PLAYER_ID = Create_agent('Player', 'Novgorod')
+	PLAYER = AGENTS[PLAYER_ID]
 
-	local_prices = ui.rect(1280 - 505, 005, 500, 200)
+	LOCAL_ACTIONS = ui.rect(1280 - 505, 005, 500, 200)
+	LOCAL_PRICES = {}
+	MARGINS = 4
+	HEIGHTS = 20
+	for _, item in ipairs(GOODS) do
+		LOCAL_PRICES[item] = {}
+		LOCAL_PRICES[item].label = LOCAL_ACTIONS:subrect(MARGINS, MARGINS + (_ - 1) * HEIGHTS, 100, HEIGHTS, "left", "up")
+		LOCAL_PRICES[item].price = LOCAL_ACTIONS:subrect(MARGINS * 2 + 100, MARGINS + (_ - 1) * HEIGHTS, 40, HEIGHTS, "left", "up")
+	end
+
+  ---@type Rect
+	LOCAL_PATHS = ui.rect(5, 5, 300, 600)
+	Update_local_base_price()
+
+  ---@type table<string, Rect>
+	LOCAL_PATHS_UI_LIST = {}
+	Update_player_local_paths()
 end
+
+function Update_player_local_paths()
+	local node = PLAYER.node
+
+	for _, target in pairs(NODE_TO_CONNECTION[node]) do
+		local action_move_rect = LOCAL_PATHS.subrect(5, _ * 10, 295, 20)
+		LOCAL_PATHS_UI_LIST[target] = action_move_rect
+	end
+end
+
+PRICE_UPDATE_TIMER = 0
+
 
 function love.update(dt)
 	---  CAMERA UPDATES ---
-	ZOOM_SPEED = math.min(5, math.max(-5, ZOOM_SPEED + dt * ZOOM_DIR))
-	ZOOM = math.min(math.max(ZOOM * math.exp(ZOOM_SPEED * dt), 0), 10)
+	ZOOM_SPEED = math.min(500, math.max(-500, ZOOM_SPEED + dt * ZOOM_DIR * 50 ))
+	ZOOM = math.min(math.max(ZOOM * math.exp(ZOOM_SPEED * dt), 0), 5)
 	ZOOM_SPEED = ZOOM_SPEED * math.exp(-dt) * (1 - ZOOM_FRICTION)
 	
 	CAMERA_SPEED.x = math.min(500, math.max(-500, CAMERA_SPEED.x + 5000 * dt * CAMERA_DIR.x))
@@ -164,18 +252,25 @@ function love.update(dt)
 
 	CAMERA_SPEED.x = CAMERA_SPEED.x * (1 - CAMERA_FRICTION)
 	CAMERA_SPEED.y = CAMERA_SPEED.y * (1 - CAMERA_FRICTION)
+
+	PRICE_UPDATE_TIMER = PRICE_UPDATE_TIMER + dt
+	if (PRICE_UPDATE_TIMER > 10) then
+		Update_local_base_price()
+		PRICE_UPDATE_TIMER = 0
+	end
 end
 
-display = {}
+DISPLAY = {}
 
-function apply_zoom(p)
+function APPLY_ZOOM(p)
 	return {
 		x= (p.x - SCREEN_CENTER.x) * ZOOM + SCREEN_CENTER.x,
 		y= (p.y - SCREEN_CENTER.y) * ZOOM + SCREEN_CENTER.y
 	}
 end
 
-function apply_camera(p) 
+
+function APPLY_CAMERA(p) 
 	return {
 	x= (p.x - CAMERA.x),
 	y= (p.y - CAMERA.y)
@@ -183,57 +278,79 @@ function apply_camera(p)
 end
 
 function love.draw()
-	for name, node in pairs(nodes) do
-		display[name] = apply_zoom(apply_camera(node)) 	
-		local rect = node_model_rects[name]
-		rect.x = display[name].x - SCALE * ZOOM
-		rect.y = display[name].y - SCALE * ZOOM
-		rect.width = SCALE * 2 * ZOOM
-		rect.height = SCALE * 2 * ZOOM
+	--- creating display node rectangles
+	for name, node in pairs(NODES) do
+		DISPLAY[name] = APPLY_ZOOM(APPLY_CAMERA(node))
+		local rect = NODE_MODEL_RECTS[name]
 
-		local name_rect = node_name_rects[name]
-		name_rect.x = display[name].x - 50 
-		name_rect.y = display[name].y - SCALE
+		SIZE = math.sqrt(node.population / 5000)
+
+		rect.x = DISPLAY[name].x - SCALE * ZOOM * SIZE
+		rect.y = DISPLAY[name].y - SCALE * ZOOM * SIZE
+		rect.width = SCALE * 2 * ZOOM * SIZE
+		rect.height = SCALE * 2 * ZOOM * SIZE
+
+		local name_rect = NODE_NAME_RECTS[name]
+		name_rect.x = DISPLAY[name].x - 50
+		name_rect.y = DISPLAY[name].y - SCALE
 	end
 
-	love.graphics.setColor(0.3, 0.7, 0.8)
-	ui.outline(local_prices)
 
 	love.graphics.setColor(0, 0.2, 0.2)
-	for name, node in pairs(nodes) do
-		ui.outline(node_model_rects[name])
+	for name, node in pairs(NODES) do
+		ui.outline(NODE_MODEL_RECTS[name])
 	end
+	
 
-	for _, connection in pairs(connections) do
-		local node1 = display[connection[1]]
-		local node2 = display[connection[2]]
+	for _, connection in pairs(CONNECTIONS) do
+		local node1 = DISPLAY[connection[1]]
+		local node2 = DISPLAY[connection[2]]
 		love.graphics.line(node1.x, node1.y, node2.x, node2.y)
 	end
 
 
-	draw_player()
+	DRAW_PLAYER()
 
 	love.graphics.setColor(1, 1, 1)
-	if (selected_node ~= nil) then
+	if (SELECTED_NODE ~= nil) then
 		love.graphics.circle('line',
-		selected_node.x, selected_node.y, 15)
+		DISPLAY[SELECTED_NODE.name].x, DISPLAY[SELECTED_NODE.name].y, 15)
 	end
 
 
 	love.graphics.setLineWidth(2)
 	love.graphics.setColor(1, 0.4, 0.4)
-	for name, node in pairs(nodes) do
-		ui.centered_text(name, node_name_rects[name])
+	for name, node in pairs(NODES) do
+		ui.centered_text(name, NODE_NAME_RECTS[name])
 	end
 
+	love.graphics.setColor(0.3, 0.7, 0.8)
+	ui.outline(LOCAL_ACTIONS)
+	for _, item in pairs(GOODS) do
+		ui.outline( LOCAL_PRICES[item].label )
+		ui.text( item, LOCAL_PRICES[item].label, 'left', 'center' )
+		ui.outline( LOCAL_PRICES[item].price )
+
+		ui.text(
+			PRICE[PLAYER.node][item],
+			LOCAL_PRICES[item].price,
+			"right",
+      "center"
+		)
+	end
 	ui.finalize_frame()
 end
 
-function draw_player()
+function DRAW_PLAYER()
 	love.graphics.setColor(0.3, 0.7, 0.8)
-	local node = display[player.node]
+	local node = DISPLAY[PLAYER.node]
 	love.graphics.circle('line', node.x, node.y, 10)
 end
+
+--- draw small grid instead of rectangle depending on population
+function DRAW_CITY()
+end
+
 
 
 function love.keypressed(key)
@@ -266,7 +383,6 @@ function love.keyreleased(key)
 	if (key == "k") and ZOOM_DIR == 1 then
 		ZOOM_DIR = 0
 	end
-	
 	if (key == "w") and CAMERA_DIR.y == -1 then
 		CAMERA_DIR.y = 0
 	end
@@ -290,14 +406,16 @@ function love.mousereleased(x, y, button, istouch, presses)
 	ui.on_mousereleased(x, y, button, istouch, presses)
 end
 
+
 function love.mousemoved(x, y, dx, dy, istouch)
 	ui.on_mousemoved(x, y, dx, dy, istouch)
 
-	selected_node = nil
-	for name, node in pairs(nodes) do
+	SELECTED_NODE = nil
+	for name, raw_node in pairs(NODES) do
+		local node = APPLY_ZOOM(APPLY_CAMERA(raw_node))
 		if   (node.x - x) * (node.x - x)
 		   + (node.y - y) * (node.y - y) < 400 then
-			selected_node = node
+			SELECTED_NODE = raw_node
 			break
 		end
 	end
