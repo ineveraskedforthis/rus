@@ -216,12 +216,10 @@ function love.load()
 		LOCAL_PRICES[item].label = LOCAL_ACTIONS:subrect(MARGINS, MARGINS + (_ - 1) * HEIGHTS, 100, HEIGHTS, "left", "up")
 		LOCAL_PRICES[item].price = LOCAL_ACTIONS:subrect(MARGINS * 2 + 100, MARGINS + (_ - 1) * HEIGHTS, 40, HEIGHTS, "left", "up")
 	end
-
   ---@type Rect
 	LOCAL_PATHS = ui.rect(5, 5, 300, 600)
 	Update_local_base_price()
 
-  ---@type table<string, Rect>
 	LOCAL_PATHS_UI_LIST = {}
 	Update_player_local_paths()
 end
@@ -230,7 +228,7 @@ function Update_player_local_paths()
 	local node = PLAYER.node
 
 	for _, target in pairs(NODE_TO_CONNECTION[node]) do
-		local action_move_rect = LOCAL_PATHS.subrect(5, _ * 10, 295, 20)
+		local action_move_rect = LOCAL_PATHS:subrect(5, _ * 30, 290, 20, 'left', 'up')
 		LOCAL_PATHS_UI_LIST[target] = action_move_rect
 	end
 end
@@ -270,7 +268,7 @@ function APPLY_ZOOM(p)
 end
 
 
-function APPLY_CAMERA(p) 
+function APPLY_CAMERA(p)
 	return {
 	x= (p.x - CAMERA.x),
 	y= (p.y - CAMERA.y)
@@ -338,6 +336,12 @@ function love.draw()
       "center"
 		)
 	end
+
+  ui.outline(LOCAL_PATHS)
+  for node, rect in pairs(LOCAL_PATHS_UI_LIST) do
+    ui.outline(rect)
+    ui.text( node, rect, "center", 'center')
+  end
 	ui.finalize_frame()
 end
 
