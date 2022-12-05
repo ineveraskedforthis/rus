@@ -1,0 +1,3 @@
+[submodule "milky"]
+	path = milky
+	url = https://github.com/ineveraskedforthis/milky
