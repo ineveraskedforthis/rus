@@ -1,6 +1,8 @@
 love.window.setMode(1280, 720)
 local ui = require "milky.milky"
 ui.set_reference_screen_dimensions(1280, 720)
+
+---@type table<NodeID, Node>
 NODES = {}
 PRICE = {}
 
@@ -8,7 +10,22 @@ CONNECTIONS = {}
 NODE_TO_CONNECTION = {}
 NODE_NODE_CONNECTION = {}
 
+---@alias AgentID number
+---@alias NodeID string
+
+---@type AgentID
 FREE_AGENT_ID = 1
+
+---@alias time number
+
+---@class Agent
+---@field name string
+---@field capacity number
+---@field node NodeID
+---@field target_node NodeID
+---@field travel_time time
+
+---@type table<AgentID, Agent>
 AGENTS = {}
 
 NODE_NAME_RECTS = {}
@@ -64,6 +81,24 @@ LUXURY_GOODS = {"furs", "silver"}
 INDUSTRY_SIZE = {}
 INDUSTRY_PSIZE = {}
 STOCK = {}
+
+---@class Node
+---@field x number
+---@field y number
+---@field population number
+---@field name string
+---@field prosperity number
+
+---returns estimation for travel time between two nodes 
+---@param a NodeID
+---@param b NodeID
+---@return time
+function Travel_time(a, b)
+  A = NODES[a]
+  B = NODES[b]
+
+  return math.abs(A.x - B.x) + math.abs(A.y - B.y)
+end
 
 function Create_node(name, x, y, population)
 	PRICE[name] = {}
@@ -127,11 +162,17 @@ function Update_local_base_price()
 	end
 end
 
+---Creates new 
+---@param name string
+---@param node NodeID
+---@return AgentID
 function Create_agent(name, node)
 	AGENTS[FREE_AGENT_ID] = {}
 	AGENTS[FREE_AGENT_ID].name = name
 	AGENTS[FREE_AGENT_ID].node = node
+  AGENTS[FREE_AGENT_ID].target_node = node
 	AGENTS[FREE_AGENT_ID].capacity = 5
+  AGENTS[FREE_AGENT_ID].travel_time = 0
 	FREE_AGENT_ID = FREE_AGENT_ID + 1
 
 	return FREE_AGENT_ID - 1
@@ -141,10 +182,42 @@ function Event_hanseatic_traders()
 
 end
 
+---Moves player to node
+---@param node NodeID
 function Player_move(node)
+  if PLAYER.target_node ~= PLAYER.node then
+    return
+  end
 	if NODE_NODE_CONNECTION[node][PLAYER.node] then
-		PLAYER.node = node
+		PLAYER.target_node = node
+    Update_player_local_paths()
 	end
+end
+
+function Player_update(dt)
+  if PLAYER.target_node ~= PLAYER.node then
+    PLAYER.travel_time = PLAYER.travel_time + dt * 100
+  end
+
+  if PLAYER.travel_time > Travel_time(PLAYER.node, PLAYER.target_node) then
+    PLAYER.node = PLAYER.target_node
+    PLAYER.travel_time = 0
+    Update_player_local_paths()
+  end
+end
+
+function Player_draw()
+  if PLAYER.node == PLAYER.target_node then
+    local x = DISPLAY[PLAYER.node].x
+    local y = DISPLAY[PLAYER.node].y
+    love.graphics.circle('line', x, y, 10)
+    return
+  end
+  local ratio = PLAYER.travel_time / Travel_time(PLAYER.node, PLAYER.target_node)
+  local x = DISPLAY[PLAYER.node].x * (1 - ratio) + DISPLAY[PLAYER.target_node].x * ratio
+  local y = DISPLAY[PLAYER.node].y * (1 - ratio) + DISPLAY[PLAYER.target_node].y * ratio
+  love.graphics.circle('line', x, y, 10)
+  love.graphics.circle('line', DISPLAY[PLAYER.target_node].x, DISPLAY[PLAYER.target_node].y, 20)
 end
 
 function Buy()
@@ -162,7 +235,7 @@ function love.load()
 	love.graphics.setFont(font_to_use)
 
 	Create_node("Novgorod", 	200, 100,     	 40000)
-		
+
 	Create_node("Torzhok",		200, 160,	  2000)
 
 	Create_node("Tver", 		210, 180,	 10000)
@@ -173,12 +246,12 @@ function love.load()
 	Create_node("Kostroma",		340, 270,	  2000)
 	Create_node("Nizhny Novgorod",  350, 300,	  9000)
 	Create_node("Vladimir",		250, 290,	 25000)
-	
+
 
 	Create_node("Bulgaria",		600, 320,	100000)
-	
 
-	
+
+
 	Create_node("Visby",		40,  40,	  4000)
 	Create_node("Riga",		50,  100,	 20000)
 	Create_node("Pskov",		120, 120,	 20000)
@@ -193,15 +266,15 @@ function love.load()
 
 	Connect("Yaroslavl", "Rostov")
 	Connect("Yaroslavl", "Kostroma")
-	
+
 	Connect("Nizhny Novgorod", "Vladimir")
 	Connect("Nizhny Novgorod", "Bulgaria")
 	Connect("Nizhny Novgorod", "Kostroma")
-	
+
 	Connect("Novgorod", "Pskov")
 	Connect("Novgorod", "Neva")
 	Connect("Novgorod", "Torzhok")
-	
+
 	Connect("Riga", "Pskov")
 
 	PLAYER_ID = Create_agent('Player', 'Novgorod')
@@ -220,13 +293,12 @@ function love.load()
 	LOCAL_PATHS = ui.rect(5, 5, 300, 600)
 	Update_local_base_price()
 
-	LOCAL_PATHS_UI_LIST = {}
 	Update_player_local_paths()
 end
 
 function Update_player_local_paths()
 	local node = PLAYER.node
-
+  LOCAL_PATHS_UI_LIST = {}
 	for _, target in pairs(NODE_TO_CONNECTION[node]) do
 		local action_move_rect = LOCAL_PATHS:subrect(5, _ * 30, 290, 20, 'left', 'up')
 		LOCAL_PATHS_UI_LIST[target] = action_move_rect
@@ -241,7 +313,7 @@ function love.update(dt)
 	ZOOM_SPEED = math.min(500, math.max(-500, ZOOM_SPEED + dt * ZOOM_DIR * 50 ))
 	ZOOM = math.min(math.max(ZOOM * math.exp(ZOOM_SPEED * dt), 0), 5)
 	ZOOM_SPEED = ZOOM_SPEED * math.exp(-dt) * (1 - ZOOM_FRICTION)
-	
+
 	CAMERA_SPEED.x = math.min(500, math.max(-500, CAMERA_SPEED.x + 5000 * dt * CAMERA_DIR.x))
 	CAMERA_SPEED.y = math.min(500, math.max(-500, CAMERA_SPEED.y + 5000 * dt * CAMERA_DIR.y))
 
@@ -256,6 +328,8 @@ function love.update(dt)
 		Update_local_base_price()
 		PRICE_UPDATE_TIMER = 0
 	end
+
+  Player_update(dt)
 end
 
 DISPLAY = {}
@@ -298,7 +372,6 @@ function love.draw()
 	for name, node in pairs(NODES) do
 		ui.outline(NODE_MODEL_RECTS[name])
 	end
-	
 
 	for _, connection in pairs(CONNECTIONS) do
 		local node1 = DISPLAY[connection[1]]
@@ -306,8 +379,7 @@ function love.draw()
 		love.graphics.line(node1.x, node1.y, node2.x, node2.y)
 	end
 
-
-	DRAW_PLAYER()
+  Player_draw()
 
 	love.graphics.setColor(1, 1, 1)
 	if (SELECTED_NODE ~= nil) then
@@ -340,15 +412,12 @@ function love.draw()
   ui.outline(LOCAL_PATHS)
   for node, rect in pairs(LOCAL_PATHS_UI_LIST) do
     ui.outline(rect)
-    ui.text( node, rect, "center", 'center')
+    if ui.text_button( node, rect ) then
+      Player_move(node)
+    end
   end
-	ui.finalize_frame()
-end
 
-function DRAW_PLAYER()
-	love.graphics.setColor(0.3, 0.7, 0.8)
-	local node = DISPLAY[PLAYER.node]
-	love.graphics.circle('line', node.x, node.y, 10)
+	ui.finalize_frame()
 end
 
 --- draw small grid instead of rectangle depending on population
