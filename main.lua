@@ -154,10 +154,13 @@ function Update_local_base_price()
 		  consumption[goods] = node_entity.population / 10000
 	  end
 	  for _, goods in pairs(GOODS) do
-		  production[goods] = INDUSTRY_SIZE[node][goods] + 1
+		  production[goods] = INDUSTRY_SIZE[node][goods] + 0.1
   	end
 	  for _, goods in pairs(GOODS) do
-		  PRICE[node][goods] = (consumption[goods] / production[goods]) * 10
+      local demand = math.max(10, consumption[goods]) / (math.max(1, PRICE[node][goods]))
+		  local price_drift = (demand - production[goods]) / (demand + production[goods]) * 2
+      price_drift = math.floor(price_drift + 0.5)
+      PRICE[node][goods] = math.max(1, math.floor((PRICE[node][goods] + price_drift)))
 	  end
 	end
 end
@@ -220,12 +223,29 @@ function Player_draw()
   love.graphics.circle('line', DISPLAY[PLAYER.target_node].x, DISPLAY[PLAYER.target_node].y, 20)
 end
 
-function Buy()
+TRADE_ROUTES = {}
+TRADE_ROUTES_BY_START = {}
+TRADE_ROUTES_BY_END = {}
 
+
+Trade_route = {}
+Trade_route.new = function(start_node, end_node, good, owner)
+  local trade_route = {}
+
+  trade_route.start = start_node
+
+  return trade_route
 end
 
-function Sell()
+---Establish trade route, which buys good in a start node and sells in the end node
+---@param start_node Node
+---@param end_node Node
+---@param good goods
+---@param owner Agent
+function Establish_trade_route(start_node, end_node, good, owner)
+  TRADE_ROUTES.push(trade_route)
 
+  return trade_route
 end
 
 
@@ -234,7 +254,12 @@ function love.load()
 	local font_to_use = love.graphics.newFont(font_size)
 	love.graphics.setFont(font_to_use)
 
-	Create_node("Novgorod", 	200, 100,     	 40000)
+	Create_node("Novgorod", 200, 100, 40000)
+  Add_industry("Novgorod", "furs", 50)
+  Add_industry("Novgorod", "cloth", 10)
+  Add_industry("Novgorod", "iron", 10)
+  Add_industry("Novgorod", "farms", 5)
+  Add_industry("Novgorod", "honey", 10)
 
 	Create_node("Torzhok",		200, 160,	  2000)
 
@@ -256,7 +281,7 @@ function love.load()
 	Create_node("Riga",		50,  100,	 20000)
 	Create_node("Pskov",		120, 120,	 20000)
 	Create_node("Neva",		200, 50,	   700)
-
+  Add_industry("Neva", "iron", 40)
 
 
 	Connect("Tver", "Yaroslavl")
@@ -287,9 +312,9 @@ function love.load()
 	for _, item in ipairs(GOODS) do
 		LOCAL_PRICES[item] = {}
 		LOCAL_PRICES[item].label = LOCAL_ACTIONS:subrect(MARGINS, MARGINS + (_ - 1) * HEIGHTS, 100, HEIGHTS, "left", "up")
-		LOCAL_PRICES[item].price = LOCAL_ACTIONS:subrect(MARGINS * 2 + 100, MARGINS + (_ - 1) * HEIGHTS, 40, HEIGHTS, "left", "up")
+		LOCAL_PRICES[item].price = LOCAL_ACTIONS:subrect(MARGINS * 2 + 100, MARGINS + (_ - 1) * HEIGHTS, 100, HEIGHTS, "left", "up")
 	end
-  ---@type Rect
+
 	LOCAL_PATHS = ui.rect(5, 5, 300, 600)
 	Update_local_base_price()
 
@@ -324,7 +349,7 @@ function love.update(dt)
 	CAMERA_SPEED.y = CAMERA_SPEED.y * (1 - CAMERA_FRICTION)
 
 	PRICE_UPDATE_TIMER = PRICE_UPDATE_TIMER + dt
-	if (PRICE_UPDATE_TIMER > 10) then
+	if (PRICE_UPDATE_TIMER > 0.1) then
 		Update_local_base_price()
 		PRICE_UPDATE_TIMER = 0
 	end
